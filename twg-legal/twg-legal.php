@@ -3,7 +3,7 @@
  * Plugin Name: TWG Legal
  * Plugin URI: https://github.com/JDigital-Studios/twg-legal
  * Description: Renders TWG legal pages via Legal SDK with admin-configurable site metadata.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: JDigital Studios
  * License: GPL-2.0-or-later
  * Text Domain: twg-legal
@@ -15,6 +15,7 @@ if (!defined('ABSPATH')) {
 
 final class TWG_Legal_Plugin {
     const OPTION_KEY = 'twg_legal_settings';
+    const TEMPLATE_META_KEY = '_wp_page_template';
 
     private static $instance = null;
     private $shortcode_used = false;
@@ -33,6 +34,7 @@ final class TWG_Legal_Plugin {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_assets'));
         add_action('wp_head', array($this, 'maybe_print_custom_styles'));
 
+        add_filter('theme_page_templates', array($this, 'register_page_templates'));
         add_filter('template_include', array($this, 'template_include'));
 
         add_shortcode('twg-legal', array($this, 'render_shortcode'));
@@ -52,6 +54,29 @@ final class TWG_Legal_Plugin {
             'terms-of-service' => 'templates/terms-of-service.php',
             'supply-chain-transparency' => 'templates/supply-chain-transparency.php',
         );
+    }
+
+    public static function page_template_map() {
+        return array(
+            'twg-legal/privacy-policy.php' => 'privacy-policy',
+            'twg-legal/terms-of-service.php' => 'terms-of-service',
+            'twg-legal/supply-chain-transparency.php' => 'supply-chain-transparency',
+        );
+    }
+
+    public function register_page_templates($templates) {
+        if (!is_array($templates)) {
+            $templates = array();
+        }
+
+        $legal_pages = self::legal_pages();
+        foreach (self::page_template_map() as $template_key => $legal_slug) {
+            if (isset($legal_pages[$legal_slug])) {
+                $templates[$template_key] = $legal_pages[$legal_slug];
+            }
+        }
+
+        return $templates;
     }
 
     public function register_settings() {
@@ -176,8 +201,21 @@ final class TWG_Legal_Plugin {
             return $template;
         }
 
-        $slug = $post->post_name;
-        if (!array_key_exists($slug, self::legal_pages())) {
+        $slug = '';
+        $selected_template = (string) get_post_meta($post->ID, self::TEMPLATE_META_KEY, true);
+        $page_template_map = self::page_template_map();
+
+        if (isset($page_template_map[$selected_template])) {
+            $slug = $page_template_map[$selected_template];
+        } else {
+            // Backward compatibility: canonical slug-based pages still route automatically.
+            $canonical_slug = $post->post_name;
+            if (array_key_exists($canonical_slug, self::legal_pages())) {
+                $slug = $canonical_slug;
+            }
+        }
+
+        if ('' === $slug) {
             return $template;
         }
 
@@ -195,15 +233,21 @@ final class TWG_Legal_Plugin {
     }
 
     public function enqueue_assets() {
+        $this->register_assets();
+
         if ($this->should_load_assets()) {
-            wp_enqueue_script(
-                'twg-legal-sdk',
-                plugins_url('assets/js/wp-page-loader.js', __FILE__),
-                array(),
-                '1.0.2',
-                true
-            );
+            wp_enqueue_script('twg-legal-sdk');
         }
+    }
+
+    private function register_assets() {
+        wp_register_script(
+            'twg-legal-sdk',
+            plugins_url('assets/js/wp-page-loader.js', __FILE__),
+            array(),
+            '1.0.3',
+            true
+        );
     }
 
     private function should_load_assets() {
@@ -211,14 +255,41 @@ final class TWG_Legal_Plugin {
             return true;
         }
 
-        if (is_page()) {
-            global $post;
-            if ($post instanceof WP_Post && array_key_exists($post->post_name, self::legal_pages())) {
-                return true;
-            }
+        if (!is_singular()) {
+            return false;
+        }
+
+        global $post;
+        if (!$post instanceof WP_Post) {
+            $post = get_queried_object();
+        }
+
+        if (!$post instanceof WP_Post) {
+            return false;
+        }
+
+        if ($this->is_legal_page($post)) {
+            return true;
+        }
+
+        if (is_string($post->post_content) && has_shortcode($post->post_content, 'twg-legal')) {
+            return true;
         }
 
         return false;
+    }
+
+    private function is_legal_page($post) {
+        if (!$post instanceof WP_Post) {
+            return false;
+        }
+
+        if (array_key_exists($post->post_name, self::legal_pages())) {
+            return true;
+        }
+
+        $selected_template = (string) get_post_meta($post->ID, self::TEMPLATE_META_KEY, true);
+        return array_key_exists($selected_template, self::page_template_map());
     }
 
     public function maybe_print_custom_styles() {
@@ -245,6 +316,7 @@ final class TWG_Legal_Plugin {
         }
 
         $this->shortcode_used = true;
+        $this->register_assets();
         wp_enqueue_script('twg-legal-sdk');
 
         return $this->render_legal_markup($slug);
