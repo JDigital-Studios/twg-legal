@@ -15,7 +15,6 @@ if (!defined('ABSPATH')) {
 
 final class TWG_Legal_Plugin {
     const OPTION_KEY = 'twg_legal_settings';
-    const TEMPLATE_FILE = 'twg-legal/templates/legal-template.php';
 
     private static $instance = null;
     private $shortcode_used = false;
@@ -37,47 +36,21 @@ final class TWG_Legal_Plugin {
         add_filter('template_include', array($this, 'template_include'));
 
         add_shortcode('twg-legal', array($this, 'render_shortcode'));
-
-        register_activation_hook(__FILE__, array(__CLASS__, 'activate'));
-    }
-
-    public static function activate() {
-        $pages = self::legal_pages();
-
-        foreach ($pages as $slug => $title) {
-            $existing = get_page_by_path($slug, OBJECT, 'page');
-
-            if ($existing instanceof WP_Post) {
-                wp_update_post(array(
-                    'ID' => (int) $existing->ID,
-                    'post_title' => $title,
-                    'post_status' => 'publish',
-                ));
-                update_post_meta((int) $existing->ID, '_wp_page_template', self::TEMPLATE_FILE);
-                update_post_meta((int) $existing->ID, '_twg_legal_slug', $slug);
-                continue;
-            }
-
-            $page_id = wp_insert_post(array(
-                'post_title' => $title,
-                'post_name' => $slug,
-                'post_status' => 'publish',
-                'post_type' => 'page',
-                'post_content' => '',
-            ));
-
-            if (!is_wp_error($page_id) && $page_id > 0) {
-                update_post_meta((int) $page_id, '_wp_page_template', self::TEMPLATE_FILE);
-                update_post_meta((int) $page_id, '_twg_legal_slug', $slug);
-            }
-        }
     }
 
     public static function legal_pages() {
         return array(
             'privacy-policy' => 'TWG Legal - Privacy Policy',
             'terms-of-service' => 'TWG Legal - Terms of Service',
-            'supply-chain-transparency' => 'TWG Legal - Supply Chain Policy',
+            'supply-chain-transparency' => 'TWG Legal - Supply Chain Transparency',
+        );
+    }
+
+    public static function legal_templates() {
+        return array(
+            'privacy-policy' => 'templates/privacy-policy.php',
+            'terms-of-service' => 'templates/terms-of-service.php',
+            'supply-chain-transparency' => 'templates/supply-chain-transparency.php',
         );
     }
 
@@ -208,7 +181,12 @@ final class TWG_Legal_Plugin {
             return $template;
         }
 
-        $custom = plugin_dir_path(__FILE__) . 'templates/legal-template.php';
+        $templates = self::legal_templates();
+        if (!isset($templates[$slug])) {
+            return $template;
+        }
+
+        $custom = plugin_dir_path(__FILE__) . $templates[$slug];
         if (file_exists($custom)) {
             return $custom;
         }

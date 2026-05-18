@@ -14,10 +14,10 @@ https://github.com/TWGWprojects/wp_legal_pages
   - Legal Last Updated
   - Custom Styles
 - Plugin template routing for legal slugs via `template_include`
-- Auto page creation on activation:
-  - `privacy-policy` -> TWG Legal - Privacy Policy
-  - `terms-of-service` -> TWG Legal - Terms of Service
-  - `supply-chain-transparency` -> TWG Legal - Supply Chain Policy
+- Slug-based legal templates:
+  - `privacy-policy` -> `templates/privacy-policy.php`
+  - `terms-of-service` -> `templates/terms-of-service.php`
+  - `supply-chain-transparency` -> `templates/supply-chain-transparency.php`
 - Shortcode support:
   - `[twg-legal slug="privacy-policy"]`
   - `[twg-legal slug="terms-of-service"]`
@@ -42,13 +42,19 @@ The plugin renders the required wrapper/attributes:
 1. Copy the `twg-legal` plugin folder into `wp-content/plugins/`.
 2. Activate **TWG Legal** in WordPress Admin -> Plugins.
 3. Go to **Settings -> TWG Legal** and configure your legal site values.
+4. Manually create/publish these WordPress pages (exact slugs):
+   - `privacy-policy`
+   - `terms-of-service`
+   - `supply-chain-transparency`
 
 ## Usage
 
-Option A: Use one of the auto-created pages by slug:
+Option A: Use manually created pages by slug:
 - `/privacy-policy`
 - `/terms-of-service`
 - `/supply-chain-transparency`
+
+When the page slug matches one of the above, the plugin automatically routes that page to the corresponding TWG Legal template file.
 
 Option B: Use shortcode in any page/post:
 
