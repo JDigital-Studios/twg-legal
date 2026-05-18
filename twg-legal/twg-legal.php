@@ -86,9 +86,9 @@ final class TWG_Legal_Plugin {
 
         add_settings_section('twg_legal_main', __('TWG Legal Settings', 'twg-legal'), '__return_false', 'twg-legal');
 
-        $this->add_field('legal_name', 'Legal Name');
-        $this->add_field('legal_email_domain', 'Legal Email Domain');
-        $this->add_field('legal_last_updated', 'Legal Last Updated');
+        $this->add_field('legal_name', 'Legal Name', 'Used for {SITE} token replacement and the data-legal-site attribute. Example: Meiomi Wines.');
+        $this->add_field('legal_email_domain', 'Legal Email Domain', 'Used for {EMAIL} token replacement and the data-legal-emaildomain attribute. Example: meiomi.com.');
+        $this->add_field('legal_last_updated', 'Legal Last Updated', 'Default value placed in the data-last-update attribute on legal pages. Example: May 18, 2026.');
 
         add_settings_field(
             'custom_styles',
@@ -96,18 +96,24 @@ final class TWG_Legal_Plugin {
             array($this, 'render_textarea_field'),
             'twg-legal',
             'twg_legal_main',
-            array('key' => 'custom_styles')
+            array(
+                'key' => 'custom_styles',
+                'description' => 'Optional CSS injected only on TWG Legal template and shortcode renders.',
+            )
         );
     }
 
-    private function add_field($key, $label) {
+    private function add_field($key, $label, $description = '') {
         add_settings_field(
             $key,
             esc_html__($label, 'twg-legal'),
             array($this, 'render_text_field'),
             'twg-legal',
             'twg_legal_main',
-            array('key' => $key)
+            array(
+                'key' => $key,
+                'description' => $description,
+            )
         );
     }
 
@@ -155,6 +161,7 @@ final class TWG_Legal_Plugin {
         $settings = $this->get_settings();
         $key = isset($args['key']) ? (string) $args['key'] : '';
         $value = isset($settings[$key]) ? $settings[$key] : '';
+        $description = isset($args['description']) ? (string) $args['description'] : '';
 
         printf(
             '<input type="text" class="regular-text" name="%1$s[%2$s]" value="%3$s" />',
@@ -162,12 +169,17 @@ final class TWG_Legal_Plugin {
             esc_attr($key),
             esc_attr($value)
         );
+
+        if ('' !== $description) {
+            printf('<p class="description">%s</p>', esc_html($description));
+        }
     }
 
     public function render_textarea_field($args) {
         $settings = $this->get_settings();
         $key = isset($args['key']) ? (string) $args['key'] : '';
         $value = isset($settings[$key]) ? $settings[$key] : '';
+        $description = isset($args['description']) ? (string) $args['description'] : '';
 
         printf(
             '<textarea class="large-text code" rows="8" name="%1$s[%2$s]">%3$s</textarea>',
@@ -175,6 +187,10 @@ final class TWG_Legal_Plugin {
             esc_attr($key),
             esc_textarea($value)
         );
+
+        if ('' !== $description) {
+            printf('<p class="description">%s</p>', esc_html($description));
+        }
     }
 
     public function template_include($template) {
