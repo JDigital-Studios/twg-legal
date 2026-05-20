@@ -3,7 +3,7 @@
  * Plugin Name: TWG Legal
  * Plugin URI: https://github.com/JDigital-Studios/twg-legal
  * Description: Renders TWG legal pages via Legal SDK with admin-configurable site metadata.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: JDigital Studios
  * License: GPL-2.0-or-later
  * Text Domain: twg-legal
@@ -86,7 +86,7 @@ final class TWG_Legal_Plugin {
 
         $this->add_field('legal_name', 'Legal Name', 'Used for {SITE} token replacement and the data-legal-site attribute. Example: Meiomi Wines.');
         $this->add_field('legal_email_domain', 'Legal Email Domain', 'Used for {EMAIL} token replacement and the data-legal-emaildomain attribute. Example: meiomi.com.');
-        $this->add_field('legal_last_updated', 'Legal Last Updated', 'Default value placed in the data-last-update attribute on legal pages. Example: May 18, 2026.');
+
 
         add_settings_field(
             'custom_styles',
@@ -121,7 +121,7 @@ final class TWG_Legal_Plugin {
         $sanitized = array();
         $sanitized['legal_name'] = isset($input['legal_name']) ? sanitize_text_field($input['legal_name']) : '';
         $sanitized['legal_email_domain'] = isset($input['legal_email_domain']) ? sanitize_text_field($input['legal_email_domain']) : '';
-        $sanitized['legal_last_updated'] = isset($input['legal_last_updated']) ? sanitize_text_field($input['legal_last_updated']) : '';
+
         $sanitized['custom_styles'] = isset($input['custom_styles']) ? sanitize_textarea_field($input['custom_styles']) : '';
 
         return $sanitized;
@@ -245,7 +245,7 @@ final class TWG_Legal_Plugin {
             'twg-legal-sdk',
             plugins_url('assets/js/wp-page-loader.js', __FILE__),
             array(),
-            '1.0.3',
+            '1.0.4',
             true
         );
     }
@@ -325,13 +325,13 @@ final class TWG_Legal_Plugin {
     public function render_legal_markup($slug) {
         $legal_name = (string) $this->get_setting('legal_name', '');
         $email_domain = (string) $this->get_setting('legal_email_domain', '');
-        $last_updated = (string) $this->get_setting('legal_last_updated', '');
+
 
         ob_start();
         ?>
 <div data-legal-site="<?php echo esc_attr($legal_name); ?>" data-legal-emaildomain="<?php echo esc_attr($email_domain); ?>">
   <div id="legal-page" data-slug="<?php echo esc_attr($slug); ?>">
-    <p id="legal-last-updated" data-last-update="<?php echo esc_attr($last_updated); ?>"></p>
+    <p id="legal-last-updated"></p>
     <h1 id="legal-title"></h1>
     <div id="legal-content"></div>
   </div>
@@ -345,7 +345,7 @@ final class TWG_Legal_Plugin {
         $defaults = array(
             'legal_name' => '',
             'legal_email_domain' => '',
-            'legal_last_updated' => '',
+
             'custom_styles' => '',
         );
 

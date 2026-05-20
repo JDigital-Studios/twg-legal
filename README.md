@@ -11,7 +11,6 @@ https://github.com/TWGWprojects/wp_legal_pages
 - Admin settings page: **Settings -> TWG Legal**
   - Legal Name
   - Legal Email Domain
-  - Legal Last Updated
   - Custom Styles
 - Plugin template routing via:
   - page template dropdown selection on any WordPress page
@@ -36,12 +35,14 @@ The plugin renders the required wrapper/attributes:
 ```html
 <div data-legal-site="LEGAL_NAME_FIELD" data-legal-emaildomain="LEGAL_EMAIL_DOMAIN_FIELD">
   <div id="legal-page" data-slug="privacy-policy">
-    <p id="legal-last-updated" data-last-update="LEGAL_LAST_UPDATED"></p>
+    <p id="legal-last-updated"></p>
     <h1 id="legal-title"></h1>
     <div id="legal-content"></div>
   </div>
 </div>
 ```
+
+Note: the plugin no longer includes a "Legal Last Updated" admin setting and no longer renders a `data-last-update` attribute on `#legal-last-updated`.
 
 ## Installation
 
