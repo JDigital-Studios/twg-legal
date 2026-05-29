@@ -26,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const site = container.parentElement.dataset.legalSite || "example";
   const email =
     container.parentElement.dataset.legalEmaildomain || "example.com";
+  const customLastUpdated =
+    (container.parentElement.dataset.legalLastUpdated || "").trim();
 
   fetch(`${API_BASE}/${slug}.json`)
     .then((res) => {
@@ -41,8 +43,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Last Updated
       const updatedEl = document.getElementById("legal-last-updated");
-      if (updatedEl && page.lastUpdated) {
-        updatedEl.textContent = `Last Updated: ${page.lastUpdated}`;
+      const lastUpdatedValue = customLastUpdated || page.lastUpdated || "";
+      if (updatedEl && lastUpdatedValue) {
+        updatedEl.textContent = `Last Updated: ${lastUpdatedValue}`;
       }
 
       const contentEl = document.getElementById("legal-content");
