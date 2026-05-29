@@ -22,12 +22,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.addEventListener("hashchange", () => scrollLegalPageHashWithOffset(100));
 
-  // Read site variables from <body data-legal-site="..." data-legal-emaildomain="...">
-  const site = container.parentElement.dataset.legalSite || "example";
-  const email =
-    container.parentElement.dataset.legalEmaildomain || "example.com";
-  const customLastUpdated =
-    (container.parentElement.dataset.legalLastUpdated || "").trim();
+  // Read site variables from nearest legal root wrapper
+  const legalRoot =
+    container.closest("[data-legal-site], #twg-legal") || container.parentElement;
+  const site = legalRoot?.dataset?.legalSite || "example";
+  const email = legalRoot?.dataset?.legalEmaildomain || "example.com";
 
   fetch(`${API_BASE}/${slug}.json`)
     .then((res) => {
@@ -43,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Last Updated
       const updatedEl = document.getElementById("legal-last-updated");
-      const lastUpdatedValue = customLastUpdated || page.lastUpdated || "";
+      const lastUpdatedValue = page.lastUpdated || "";
       if (updatedEl && lastUpdatedValue) {
         updatedEl.textContent = `Last Updated: ${lastUpdatedValue}`;
       }
@@ -164,6 +163,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       columns.forEach((col) => {
         const td = document.createElement("td");
+        const columnLabel = String(col || "");
+        td.setAttribute("data-label", columnLabel);
+
+        const labelSpan = document.createElement("span");
+        labelSpan.className = "legal-table-cell-label";
+        labelSpan.textContent = columnLabel;
+        td.appendChild(labelSpan);
+
         const value = row ? row[col] : "";
 
         // Category can be object {text, examples[]}
