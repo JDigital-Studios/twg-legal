@@ -2,6 +2,7 @@
 (() => {
   const API_BASE = "https://twgwprojects.github.io/wp_legal_pages/api";
   const LEGAL_PAGE_SELECTOR = '[data-twg-legal-page], #legal-page';
+  const LEGAL_POPUP_SELECTOR = '[data-twg-legal-popup]';
 
   /** Scroll to in-page hash target (e.g. /privacy-policy/#ccpa) with fixed header offset. */
   function scrollLegalPageHashWithOffset(offsetPx = 100) {
@@ -129,36 +130,35 @@
     return wrapper;
   }
 
-  function getScopedNode(container, selector, legacyId) {
-    return (
-      container.querySelector(selector) ||
-      Array.from(container.children).find((node) => node.id === legacyId) ||
-      null
-    );
-  }
+  /**
+   * Render legal blocks into a target container.
+   * Used by both the full legal page and the popup variant.
+   */
+  function renderLegalBlocks(container, page, { site, email }) {
+    // For full pages, content lives in a child #legal-content / [data-twg-legal-content].
+    // For popups, blocks are appended directly into the container itself.
+    const contentEl =
+      container.querySelector('[data-twg-legal-content], #legal-content') ||
+      container;
 
-  function renderLegalPage(container, page, siteConfig) {
-    const titleEl = getScopedNode(container, '[data-twg-legal-title]', 'legal-title');
-    if (titleEl) {
-      titleEl.textContent = page.title || "";
+    const titleEl = container.querySelector('[data-twg-legal-title], #legal-title');
+    if (page.title && titleEl) {
+      titleEl.textContent = page.title;
     }
 
-    const updatedEl = getScopedNode(
-      container,
-      '[data-twg-legal-last-updated]',
-      'legal-last-updated',
+    const updatedEl = container.querySelector(
+      '[data-twg-legal-last-updated], #legal-last-updated',
     );
-    const lastUpdatedValue = page.lastUpdated || "";
-    if (updatedEl) {
-      updatedEl.textContent = lastUpdatedValue
-        ? `Last Updated: ${lastUpdatedValue}`
-        : "";
+    if (page.lastUpdated && updatedEl) {
+      updatedEl.textContent = `Last Updated: ${page.lastUpdated}`;
     }
 
-    const contentEl = getScopedNode(container, '[data-twg-legal-content]', 'legal-content');
-    if (!contentEl) return;
-
-    contentEl.innerHTML = "";
+    // Only clear the resolved content target, not the whole popup container.
+    if (contentEl !== container) {
+      contentEl.innerHTML = "";
+    } else {
+      container.innerHTML = "";
+    }
 
     (page.content || []).forEach((block) => {
       let el;
@@ -173,7 +173,7 @@
         case "paragraph": {
           el = document.createElement("p");
           if (block.id) el.id = block.id;
-          el.innerHTML = replaceTokens(block.text || "", siteConfig);
+          el.innerHTML = replaceTokens(block.text || "", { site, email });
           if (block.bold) el.style.fontWeight = "bold";
           break;
         }
@@ -182,14 +182,14 @@
           el = document.createElement("ul");
           (block.items || []).forEach((item) => {
             const li = document.createElement("li");
-            li.innerHTML = replaceTokens(item || "", siteConfig);
+            li.innerHTML = replaceTokens(item || "", { site, email });
             el.appendChild(li);
           });
           break;
         }
 
         case "table": {
-          el = renderLegalTable(block, siteConfig);
+          el = renderLegalTable(block, { site, email });
           break;
         }
 
@@ -200,18 +200,19 @@
       contentEl.appendChild(el);
     });
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => scrollLegalPageHashWithOffset(100));
-    });
+    // Hash scroll only makes sense for full legal pages.
+    if (container.matches(LEGAL_PAGE_SELECTOR)) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => scrollLegalPageHashWithOffset(100));
+      });
+    }
   }
 
-  function initLegalPage(container) {
-    if (!(container instanceof HTMLElement)) return;
-
-    const slug = container.dataset.slug;
-    if (!slug || container.dataset.twgLegalLoaded === "true") return;
-    if (container.dataset.twgLegalLoading === "true") return;
-
+  /**
+   * Resolve site / email tokens for any legal container
+   * (full page, shortcode, or popup).
+   */
+  function resolveSiteConfig(container) {
     const legalRoot =
       container.closest("[data-legal-site], #twg-legal") || container.parentElement;
     const site =
@@ -220,7 +221,14 @@
       container.dataset.legalEmaildomain ||
       legalRoot?.dataset?.legalEmaildomain ||
       "example.com";
+    return { site, email };
+  }
 
+  /**
+   * Fetch a legal page JSON and render it into the given container.
+   * Shared by the full-page and popup init flows.
+   */
+  function fetchAndRenderLegal(container, slug, siteConfig) {
     container.dataset.twgLegalLoading = "true";
 
     fetch(`${API_BASE}/${slug}.json`)
@@ -229,17 +237,61 @@
         return res.json();
       })
       .then((page) => {
-        renderLegalPage(container, page, { site, email });
+        renderLegalBlocks(container, page, siteConfig);
         container.dataset.twgLegalLoaded = "true";
       })
-      .catch((err) => console.error("Legal page error:", err))
+      .catch((err) => {
+        console.error("Legal page error:", err);
+        // If the container is a popup, surface the error inline.
+        if (container.matches(LEGAL_POPUP_SELECTOR)) {
+          container.innerHTML =
+            "<p>Unable to load content. Please try again.</p>";
+        }
+      })
       .finally(() => {
         delete container.dataset.twgLegalLoading;
       });
   }
 
+  /**
+   * Initialize a full legal-page container
+   * (data-twg-legal-page or #legal-page, with data-slug).
+   */
+  function initLegalPage(container) {
+    if (!(container instanceof HTMLElement)) return;
+
+    const slug = container.dataset.slug;
+    if (!slug || container.dataset.twgLegalLoaded === "true") return;
+    if (container.dataset.twgLegalLoading === "true") return;
+
+    fetchAndRenderLegal(container, slug, resolveSiteConfig(container));
+  }
+
+  /**
+   * Initialize a popup-style legal container
+   * (data-twg-legal-popup with data-legal-slug).
+   *
+   * This is a strict opt-in path; popup markup must declare
+   * data-twg-legal-popup to use it.
+   */
+  function initLegalPopup(container) {
+    if (!(container instanceof HTMLElement)) return;
+
+    // Popup slugs may live on data-legal-slug (matches the existing
+    // Woodbridge / cupcake conventions) or on data-slug as a fallback.
+    const slug = container.dataset.legalSlug || container.dataset.slug;
+    if (!slug || container.dataset.twgLegalLoaded === "true") return;
+    if (container.dataset.twgLegalLoading === "true") return;
+
+    // Optional loading state for the popup.
+    container.innerHTML = "<p>Loading…</p>";
+
+    fetchAndRenderLegal(container, slug, resolveSiteConfig(container));
+  }
+
   function initAllLegalPages(root = document) {
     root.querySelectorAll(LEGAL_PAGE_SELECTOR).forEach(initLegalPage);
+    root.querySelectorAll(LEGAL_POPUP_SELECTOR).forEach(initLegalPopup);
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -253,6 +305,9 @@
         if (!(node instanceof HTMLElement)) return;
         if (node.matches(LEGAL_PAGE_SELECTOR)) {
           initLegalPage(node);
+        }
+        if (node.matches(LEGAL_POPUP_SELECTOR)) {
+          initLegalPopup(node);
         }
         initAllLegalPages(node);
       });
