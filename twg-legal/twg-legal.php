@@ -3,7 +3,7 @@
  * Plugin Name: TWG Legal
  * Plugin URI: https://github.com/JDigital-Studios/twg-legal
  * Description: Renders TWG legal pages via Legal SDK with admin-configurable site metadata.
- * Version: 1.0.10
+ * Version: 1.0.11
  * Author: JDigital Studios
  * License: GPL-2.0-or-later
  * Text Domain: twg-legal
@@ -242,7 +242,7 @@ final class TWG_Legal_Plugin {
             'twg-legal-sdk',
             plugins_url('assets/js/wp-page-loader.js', __FILE__),
             array(),
-            '1.0.10',
+            '1.0.11',
             true
         );
     }
@@ -252,24 +252,12 @@ final class TWG_Legal_Plugin {
             return true;
         }
 
-        if (!is_singular()) {
-            return false;
-        }
-
-        global $post;
-        if (!$post instanceof WP_Post) {
-            $post = get_queried_object();
-        }
-
-        if (!$post instanceof WP_Post) {
-            return false;
-        }
-
-        if ($this->is_legal_page($post)) {
-            return true;
-        }
-
-        if (is_string($post->post_content) && has_shortcode($post->post_content, 'twg-legal')) {
+        // The popup opt-in path (data-twg-legal-popup) is rendered by
+        // theme template parts that are not part of post_content, so we
+        // cannot reliably detect it from PHP. Enqueue the SDK on every
+        // front-end singular page and on the front page so theme popups
+        // hydrate regardless of which page they live on.
+        if (is_singular() || is_front_page() || is_home()) {
             return true;
         }
 
