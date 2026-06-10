@@ -133,54 +133,48 @@
   /**
    * Render legal blocks into a target container.
    * Used by both the full legal page and the popup variant.
+   *
+   * For popups (`data-twg-legal-popup` containers), the plugin guarantees
+   * two child slots inside the container:
+   *   - a title element (auto-created h1 if not present)
+   *   - a body element (auto-created div if not present)
+   * Body content is rendered inside the body slot. Title and body slots
+   * are deterministic and re-render-safe, so the popup can be opened
+   * multiple times without losing the title or accumulating duplicates.
    */
   function renderLegalBlocks(container, page, { site, email }) {
-    // For full pages, content lives in a child #legal-content / [data-twg-legal-content].
-    // For popups, blocks are appended directly into the container itself.
-    const contentEl =
-      container.querySelector('[data-twg-legal-content], #legal-content') ||
-      container;
-
-    // Resolve (or auto-create) a title element. In popup mode there is
-    // usually no [data-twg-legal-title] in the markup, so we synthesize
-    // one and prepend it so the title appears above the body content.
-    let titleEl = container.querySelector(
-      '[data-twg-legal-title], #legal-title',
-    );
     const isPopup = container.matches(LEGAL_POPUP_SELECTOR);
-    if (!titleEl && isPopup) {
-      titleEl = document.createElement("h1");
-      titleEl.className = "twg-legal-popup-title";
-      titleEl.setAttribute("data-twg-legal-title", "");
-      container.insertBefore(titleEl, container.firstChild);
+
+    // For full pages, content lives in a child #legal-content / [data-twg-legal-content].
+    // For popups, the plugin manages an auto-created body slot.
+    let contentEl;
+    if (isPopup) {
+      contentEl = ensurePopupBody(container);
+    } else {
+      contentEl =
+        container.querySelector('[data-twg-legal-content], #legal-content') ||
+        container;
     }
+
+    // Title: resolve (or auto-create for popups).
+    const titleEl = ensurePopupTitle(container, isPopup);
     if (page.title && titleEl) {
       titleEl.textContent = page.title;
     }
 
-    const updatedEl = container.querySelector(
-      '[data-twg-legal-last-updated], #legal-last-updated',
-    );
-    if (page.lastUpdated && updatedEl) {
-      updatedEl.textContent = `Last Updated: ${page.lastUpdated}`;
+    // Last Updated: only meaningful for full pages.
+    if (!isPopup) {
+      const updatedEl = container.querySelector(
+        '[data-twg-legal-last-updated], #legal-last-updated',
+      );
+      if (page.lastUpdated && updatedEl) {
+        updatedEl.textContent = `Last Updated: ${page.lastUpdated}`;
+      }
     }
 
-    // Only clear the resolved content target, not the whole popup container.
-    // (Auto-created title is appended after clearing, so it isn't blown away.)
-    if (contentEl !== container) {
-      contentEl.innerHTML = "";
-    } else if (titleEl) {
-      // Preserve any manually-rendered title element in the popup container
-      // by clearing everything after it.
-      let n = titleEl.nextSibling;
-      while (n) {
-        const next = n.nextSibling;
-        n.remove();
-        n = next;
-      }
-    } else {
-      container.innerHTML = "";
-    }
+    // Clear the body slot. This is safe across re-renders and is bounded
+    // to the body element, never the whole container.
+    contentEl.replaceChildren();
 
     (page.content || []).forEach((block) => {
       let el;
@@ -231,6 +225,39 @@
   }
 
   /**
+   * Ensure the popup container has a body slot.
+   * Returns the body element. Re-entrant safe: clears any pre-existing
+   * "Loading…" or stale content the theme may have set.
+   */
+  function ensurePopupBody(container) {
+    let body = container.querySelector("[data-twg-legal-popup-body]");
+    if (!body) {
+      body = document.createElement("div");
+      body.setAttribute("data-twg-legal-popup-body", "");
+      container.appendChild(body);
+    }
+    return body;
+  }
+
+  /**
+   * Ensure the popup container has a title slot.
+   * Returns the title element, or null if not in popup mode.
+   */
+  function ensurePopupTitle(container, isPopup) {
+    const existing = container.querySelector(
+      '[data-twg-legal-title], #legal-title',
+    );
+    if (existing) return existing;
+    if (!isPopup) return null;
+
+    const title = document.createElement("h1");
+    title.className = "twg-legal-popup-title";
+    title.setAttribute("data-twg-legal-title", "");
+    container.insertBefore(title, container.firstChild);
+    return title;
+  }
+
+  /**
    * Resolve site / email tokens for any legal container
    * (full page, shortcode, or popup).
    */
@@ -252,6 +279,9 @@
    */
   function fetchAndRenderLegal(container, slug, siteConfig) {
     container.dataset.twgLegalLoading = "true";
+    // Phase flag prevents the MutationObserver from re-entering
+    // init*() during the in-progress mutation sequence.
+    container.dataset.twgLegalPhase = "loading";
 
     fetch(`${API_BASE}/${slug}.json`)
       .then((res) => {
@@ -259,15 +289,24 @@
         return res.json();
       })
       .then((page) => {
-        renderLegalBlocks(container, page, siteConfig);
-        container.dataset.twgLegalLoaded = "true";
+        container.dataset.twgLegalPhase = "rendering";
+        try {
+          renderLegalBlocks(container, page, siteConfig);
+          container.dataset.twgLegalLoaded = "true";
+        } finally {
+          delete container.dataset.twgLegalPhase;
+        }
       })
       .catch((err) => {
         console.error("Legal page error:", err);
-        // If the container is a popup, surface the error inline.
+        // If the container is a popup, surface the error inline via the
+        // dedicated body slot so we don't clobber the title.
         if (container.matches(LEGAL_POPUP_SELECTOR)) {
-          container.innerHTML =
-            "<p>Unable to load content. Please try again.</p>";
+          const body = ensurePopupBody(container);
+          body.replaceChildren();
+          const p = document.createElement("p");
+          p.textContent = "Unable to load content. Please try again.";
+          body.appendChild(p);
         }
       })
       .finally(() => {
@@ -281,6 +320,7 @@
    */
   function initLegalPage(container) {
     if (!(container instanceof HTMLElement)) return;
+    if (container.dataset.twgLegalPhase) return;
 
     const slug = container.dataset.slug;
     if (!slug || container.dataset.twgLegalLoaded === "true") return;
@@ -298,6 +338,7 @@
    */
   function initLegalPopup(container) {
     if (!(container instanceof HTMLElement)) return;
+    if (container.dataset.twgLegalPhase) return;
 
     // Popup slugs may live on data-legal-slug (matches the existing
     // Woodbridge / cupcake conventions) or on data-slug as a fallback.
@@ -305,8 +346,14 @@
     if (!slug || container.dataset.twgLegalLoaded === "true") return;
     if (container.dataset.twgLegalLoading === "true") return;
 
-    // Optional loading state for the popup.
-    container.innerHTML = "<p>Loading…</p>";
+    // Render a loading state into the body slot (reuses it if it exists
+    // from a prior open). We do NOT wipe the container — the title slot
+    // belongs to the plugin and stays put across re-opens.
+    const body = ensurePopupBody(container);
+    body.replaceChildren();
+    const p = document.createElement("p");
+    p.textContent = "Loading…";
+    body.appendChild(p);
 
     fetchAndRenderLegal(container, slug, resolveSiteConfig(container));
   }
@@ -325,6 +372,7 @@
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
         if (!(node instanceof HTMLElement)) return;
+        if (node.dataset && node.dataset.twgLegalPhase) return;
         if (node.matches(LEGAL_PAGE_SELECTOR)) {
           initLegalPage(node);
         }
