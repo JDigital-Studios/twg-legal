@@ -162,14 +162,11 @@
       titleEl.textContent = page.title;
     }
 
-    // Last Updated: only meaningful for full pages.
-    if (!isPopup) {
-      const updatedEl = container.querySelector(
-        '[data-twg-legal-last-updated], #legal-last-updated',
-      );
-      if (page.lastUpdated && updatedEl) {
-        updatedEl.textContent = `Last Updated: ${page.lastUpdated}`;
-      }
+    // Last Updated: full pages use the explicit slot in markup; popups
+    // get an auto-created slot so the API date always shows in the modal.
+    const updatedEl = ensureLastUpdatedSlot(container, isPopup);
+    if (page.lastUpdated && updatedEl) {
+      updatedEl.textContent = `Last Updated: ${page.lastUpdated}`;
     }
 
     // Clear the body slot. This is safe across re-renders and is bounded
@@ -255,6 +252,34 @@
     title.setAttribute("data-twg-legal-title", "");
     container.insertBefore(title, container.firstChild);
     return title;
+  }
+
+  /**
+   * Ensure the popup container has a Last Updated slot.
+   * - Full pages: use the existing `[data-twg-legal-last-updated]` /
+   *   `#legal-last-updated` element from the plugin's render_legal_markup().
+   * - Popups: auto-create a `<p data-twg-legal-last-updated>` between the
+   *   title and body slots so the API's `lastUpdated` date always shows.
+   */
+  function ensureLastUpdatedSlot(container, isPopup) {
+    const existing = container.querySelector(
+      '[data-twg-legal-last-updated], #legal-last-updated',
+    );
+    if (existing) return existing;
+    if (!isPopup) return null;
+
+    const p = document.createElement("p");
+    p.className = "twg-legal-popup-last-updated";
+    p.setAttribute("data-twg-legal-last-updated", "");
+
+    // Place after the title slot (if any) and before the body slot (if any).
+    const body = container.querySelector("[data-twg-legal-popup-body]");
+    if (body) {
+      container.insertBefore(p, body);
+    } else {
+      container.appendChild(p);
+    }
+    return p;
   }
 
   /**
