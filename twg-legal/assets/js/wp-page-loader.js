@@ -141,7 +141,19 @@
       container.querySelector('[data-twg-legal-content], #legal-content') ||
       container;
 
-    const titleEl = container.querySelector('[data-twg-legal-title], #legal-title');
+    // Resolve (or auto-create) a title element. In popup mode there is
+    // usually no [data-twg-legal-title] in the markup, so we synthesize
+    // one and prepend it so the title appears above the body content.
+    let titleEl = container.querySelector(
+      '[data-twg-legal-title], #legal-title',
+    );
+    const isPopup = container.matches(LEGAL_POPUP_SELECTOR);
+    if (!titleEl && isPopup) {
+      titleEl = document.createElement("h1");
+      titleEl.className = "twg-legal-popup-title";
+      titleEl.setAttribute("data-twg-legal-title", "");
+      container.insertBefore(titleEl, container.firstChild);
+    }
     if (page.title && titleEl) {
       titleEl.textContent = page.title;
     }
@@ -154,8 +166,18 @@
     }
 
     // Only clear the resolved content target, not the whole popup container.
+    // (Auto-created title is appended after clearing, so it isn't blown away.)
     if (contentEl !== container) {
       contentEl.innerHTML = "";
+    } else if (titleEl) {
+      // Preserve any manually-rendered title element in the popup container
+      // by clearing everything after it.
+      let n = titleEl.nextSibling;
+      while (n) {
+        const next = n.nextSibling;
+        n.remove();
+        n = next;
+      }
     } else {
       container.innerHTML = "";
     }
