@@ -3,7 +3,7 @@
  * Plugin Name: TWG Legal
  * Plugin URI: https://github.com/JDigital-Studios/twg-legal
  * Description: Renders TWG legal pages via Legal SDK with admin-configurable site metadata.
- * Version: 1.0.12
+ * Version: 1.0.13
  * Author: JDigital Studios
  * License: GPL-2.0-or-later
  * Text Domain: twg-legal
@@ -11,6 +11,23 @@
 
 if (!defined('ABSPATH')) {
     exit;
+}
+
+/**
+ * Detect when a page is loaded in an iframe embed context (e.g. Fancybox lightbox).
+ *
+ * Themes can use this helper to suppress site chrome (header, nav, footer, age-gate
+ * scripts) when the legal page is loaded inside a modal iframe.
+ *
+ * Example in a theme's header.php:
+ *   <?php if ( ! twg_legal_is_embed() ) : ?>
+ *     <header>...</header>
+ *   <?php endif; ?>
+ *
+ * @return bool True when the current request has ?twg_legal_embed=1.
+ */
+function twg_legal_is_embed() {
+    return isset( $_GET['twg_legal_embed'] ) && ! is_admin();
 }
 
 final class TWG_Legal_Plugin {
@@ -105,7 +122,7 @@ final class TWG_Legal_Plugin {
             esc_html__($label, 'twg-legal'),
             array($this, 'render_text_field'),
             'twg-legal',
-            'twg_legal_main',
+            'twg-legal',
             array(
                 'key' => $key,
                 'description' => $description,
@@ -188,6 +205,12 @@ final class TWG_Legal_Plugin {
         }
     }
 
+    /**
+     * Route legal page requests to the appropriate template.
+     *
+     * When ?twg_legal_embed=1 is present, serves the embed template which
+     * renders only legal content with no site chrome.
+     */
     public function template_include($template) {
         if (!is_page()) {
             return $template;
@@ -216,6 +239,14 @@ final class TWG_Legal_Plugin {
             return $template;
         }
 
+        // Embed mode: serve stripped template with no header/footer
+        if (twg_legal_is_embed()) {
+            $embed_template = plugin_dir_path(__FILE__) . 'templates/embed-legal.php';
+            if (file_exists($embed_template)) {
+                return $embed_template;
+            }
+        }
+
         $templates = self::legal_templates();
         if (!isset($templates[$slug])) {
             return $template;
@@ -242,7 +273,7 @@ final class TWG_Legal_Plugin {
             'twg-legal-sdk',
             plugins_url('assets/js/wp-page-loader.js', __FILE__),
             array(),
-            '1.0.12',
+            '1.0.13',
             true
         );
     }
