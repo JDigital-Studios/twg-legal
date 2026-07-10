@@ -105,8 +105,8 @@ If your theme opens legal content from an age gate or a Fancybox lightbox, use o
 
 ### Requirements
 
-- **Plugin v1.0.11+** is required for popup containers rendered from theme template parts (e.g. `age-gate.php`).
-- **Plugin v1.0.12+** is required if you want the "Last Updated" date to appear inside the popup.
+- **Plugin v1.0.13+** is required for popup containers rendered from theme template parts (e.g. `age-gate.php`).
+- **Plugin v1.0.13+** is required if you want the "Last Updated" date to appear inside the popup.
 
 ### Approach 1: Iframe the real legal page (recommended)
 
@@ -114,8 +114,8 @@ Point Fancybox to the legal page permalink with a custom embed query flag, and s
 
 1. **Update age-gate links** to real permalinks with a custom query flag:
    ```html
-   <a href="/terms-of-service/?age_gate_embed=1" data-fancybox data-type="iframe">Terms of Service</a>
-   <a href="/privacy-policy/?age_gate_embed=1" data-fancybox data-type="iframe">Privacy Policy</a>
+   <a href="/terms-of-service/?twg_legal_embed=1" data-fancybox data-type="iframe">Terms of Service</a>
+   <a href="/privacy-policy/?twg_legal_embed=1" data-fancybox data-type="iframe">Privacy Policy</a>
    ```
    > Do **not** use `?embed=1` — that triggers WordPress core oEmbed behavior and will render the wrong template.
 
