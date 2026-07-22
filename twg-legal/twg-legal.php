@@ -3,7 +3,7 @@
  * Plugin Name: TWG Legal
  * Plugin URI: https://github.com/JDigital-Studios/twg-legal
  * Description: Renders TWG legal pages via Legal SDK with admin-configurable site metadata.
- * Version: 1.0.13
+ * Version: 1.0.14
  * Author: JDigital Studios
  * License: GPL-2.0-or-later
  * Text Domain: twg-legal
@@ -122,7 +122,7 @@ final class TWG_Legal_Plugin {
             esc_html__($label, 'twg-legal'),
             array($this, 'render_text_field'),
             'twg-legal',
-            'twg-legal',
+            'twg_legal_main',
             array(
                 'key' => $key,
                 'description' => $description,
@@ -273,7 +273,7 @@ final class TWG_Legal_Plugin {
             'twg-legal-sdk',
             plugins_url('assets/js/wp-page-loader.js', __FILE__),
             array(),
-            '1.0.13',
+            '1.0.14',
             true
         );
     }
